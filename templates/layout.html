@@ -1,0 +1,53 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{if .Title}}{{.Title}} - {{end}}{{.AppName}}</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260108">
+    <script>
+        // 初始化主题
+        (function() {
+            var theme = localStorage.getItem('theme');
+            if (theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="app">
+        {{if .ShowNav}}
+        <nav class="navbar">
+            <div class="nav-brand">
+                <a href="/">🐹 {{.AppName}}</a>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="{{if eq .ActiveNav "home"}}active{{end}}">首页</a>
+                <a href="/tags" class="{{if eq .ActiveNav "tags"}}active{{end}}">标签</a>
+                <a href="/import" class="{{if eq .ActiveNav "import"}}active{{end}}">导入</a>
+                <a href="/bookmarklet" class="{{if eq .ActiveNav "bookmarklet"}}active{{end}}">小书签</a>
+                <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">🌓</button>
+                <a href="/logout" class="nav-logout">退出</a>
+            </div>
+        </nav>
+        {{end}}
+        <main class="main-content">
+            {{template "content" .}}
+        </main>
+    </div>
+    <script src="/static/js/main.js?v=20260108"></script>
+    <script>
+        // 主题切换
+        function toggleTheme() {
+            var html = document.documentElement;
+            var current = html.getAttribute('data-theme');
+            var next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+    </script>
+</body>
+</html>
+{{end}}

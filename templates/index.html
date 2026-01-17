@@ -1,0 +1,1449 @@
+{{define "content"}}
+<form id="bulk-actions-form" method="POST" action="/bookmark/delete-selected"></form>
+<form id="bulk-move-form" method="POST" action="/bookmark/move"></form>
+
+<!-- 搜索栏 -->
+<div class="search-bar">
+    <form method="GET" action="/" id="search-form" class="search-bar-form">
+        <input type="text" name="q" id="search-input" placeholder="搜索书签..." value="{{.Search}}">
+        {{if .PageSizeParam}}
+        <input type="hidden" name="size" value="{{.PageSizeParam}}">
+        {{end}}
+        {{if .SortBy}}
+        <input type="hidden" name="sort" value="{{.SortBy}}">
+        {{end}}
+        <button type="submit" class="btn btn-primary">搜索</button>
+    </form>
+</div>
+
+<div class="page-header">
+    <div class="header-left">
+        <h1>
+            {{if .CurrentTag}}
+            <span class="tag-badge" style="background-color: {{.CurrentTag.Color}}">{{.CurrentTag.Name}}</span>
+            {{else if .Search}}
+            搜索: "{{.Search}}"
+            {{else if .CurrentFolderName}}
+            文件夹: "{{.CurrentFolderName}}"
+            {{else}}
+            全部收藏
+            {{end}}
+        </h1>
+        <span class="bookmark-count">共 {{.Total}} 条</span>
+    </div>
+    <div class="header-right">
+        <div class="header-actions">
+            <button type="button" class="btn btn-primary" id="btn-quick-add">+ 添加</button>
+            <a href="/bookmark/export" class="btn btn-outline">导出</a>
+            <button type="button" class="btn btn-outline" id="load-favicons">加载图标</button>
+            <button type="button" class="btn btn-outline" id="select-page">全选本页</button>
+            <button type="submit" class="btn btn-outline btn-danger" id="delete-selected" form="bulk-actions-form" disabled>删除选中</button>
+            <button type="button" class="btn btn-outline" id="move-selected" disabled>移动选中</button>
+            {{if not .IsAllFolders}}
+            <form method="POST" action="/bookmark/clear-folder" class="inline-form" id="clear-folder-form">
+                <input type="hidden" name="folder" value="{{.FolderParam}}">
+                <button type="submit" class="btn btn-outline btn-danger">
+                    {{if .IsRootFolder}}删除未分类{{else}}删除当前文件夹{{end}}
+                </button>
+            </form>
+            {{end}}
+            <form method="POST" action="/bookmark/clear" class="inline-form">
+                <button type="submit" class="btn btn-outline btn-danger" id="clear-all-bookmarks">清空全部</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 移动书签弹窗 -->
+<div id="move-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>移动到文件夹</h3>
+        <input type="text" id="target-folder-input" placeholder="输入目标文件夹路径（留空为根目录）" class="form-input">
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-move">取消</button>
+            <button type="button" class="btn btn-primary" id="confirm-move">确定移动</button>
+        </div>
+    </div>
+</div>
+
+<!-- Favicon加载进度弹窗 -->
+<div id="favicon-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>加载网站图标</h3>
+        <div class="favicon-progress">
+            <span id="favicon-current">0</span> / <span id="favicon-total">0</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="favicon-progress-bar" style="width: 0%"></div>
+        </div>
+        <p id="favicon-status">准备中...</p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="minimize-favicon">后台运行</button>
+            <button type="button" class="btn btn-danger" id="cancel-favicon">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 后台加载进度条 -->
+<div id="favicon-float" class="favicon-float" style="display:none;">
+    <div class="favicon-float-header">
+        <span>加载图标</span>
+        <button type="button" id="expand-favicon" title="展开">+</button>
+    </div>
+    <div class="favicon-float-progress">
+        <span id="favicon-float-text">0/0</span>
+        <div class="progress-bar">
+            <div class="progress-fill" id="favicon-float-bar" style="width: 0%"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 移动文件夹确认弹窗 -->
+<div id="folder-move-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>移动文件夹</h3>
+        <p id="folder-move-message"></p>
+        <p class="folder-move-hint">移动：保留文件夹结构<br>合并：将内容直接放入目标文件夹</p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-folder-move">取消</button>
+            <button type="button" class="btn btn-outline" id="merge-folder-move">合并</button>
+            <button type="button" class="btn btn-primary" id="confirm-folder-move">移动</button>
+        </div>
+    </div>
+</div>
+
+<!-- 快速添加弹窗 -->
+<div id="quick-add-modal" class="modal" style="display:none;">
+    <div class="modal-content quick-add-modal">
+        <h3>添加到: <span id="quick-add-folder-name">根目录</span></h3>
+        <div class="quick-add-tabs">
+            <button type="button" class="tab-btn active" data-tab="bookmark">添加收藏</button>
+            <button type="button" class="tab-btn" data-tab="folder">添加文件夹</button>
+        </div>
+        <div class="tab-content" id="tab-bookmark">
+            <div class="form-group">
+                <label>URL <span class="required">*</span></label>
+                <input type="text" id="quick-add-url" placeholder="https://example.com" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>标题（留空自动获取）</label>
+                <input type="text" id="quick-add-title" placeholder="网页标题" class="form-input">
+            </div>
+        </div>
+        <div class="tab-content" id="tab-folder" style="display:none;">
+            <div class="form-group">
+                <label>文件夹名称</label>
+                <input type="text" id="quick-add-folder-input" placeholder="新建文件夹" class="form-input">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-quick-add">取消</button>
+            <button type="button" class="btn btn-primary" id="confirm-quick-add">确定</button>
+        </div>
+    </div>
+</div>
+
+<div class="content-wrapper">
+    <aside class="sidebar">
+        <div class="sort-box">
+            <label>排序：</label>
+            <select id="sort-select" onchange="applySort(this.value)">
+                <option value=""{{if eq .SortBy ""}} selected{{end}}>默认（时间倒序）</option>
+                <option value="time_desc"{{if eq .SortBy "time_desc"}} selected{{end}}>时间 ↓</option>
+                <option value="time_asc"{{if eq .SortBy "time_asc"}} selected{{end}}>时间 ↑</option>
+                <option value="title_asc"{{if eq .SortBy "title_asc"}} selected{{end}}>标题 A-Z</option>
+                <option value="title_desc"{{if eq .SortBy "title_desc"}} selected{{end}}>标题 Z-A</option>
+                <option value="url_asc"{{if eq .SortBy "url_asc"}} selected{{end}}>URL A-Z</option>
+                <option value="url_desc"{{if eq .SortBy "url_desc"}} selected{{end}}>URL Z-A</option>
+            </select>
+        </div>
+
+        <div class="folder-tree">
+            <h3>文件夹</h3>
+            <ul class="folder-tree-list">
+                <li class="folder-tree-node {{if .IsAllFolders}}open{{end}}">
+                    <div class="folder-tree-row">
+                        <span class="folder-caret empty"></span>
+                        <a href="/{{if .PageSizeParam}}?size={{.PageSizeParam}}{{end}}" class="folder-link {{if .IsAllFolders}}active{{end}}">全部</a>
+                    </div>
+                </li>
+                {{if .HasUncategorized}}
+                <li class="folder-tree-node {{if .IsRootFolder}}open{{end}}">
+                    <div class="folder-tree-row">
+                        <span class="folder-caret empty"></span>
+                        <a href="/?folder=__root__{{if .PageSizeParam}}&size={{.PageSizeParam}}{{end}}" class="folder-link {{if .IsRootFolder}}active{{end}}">未分类</a>
+                    </div>
+                </li>
+                {{end}}
+                {{template "folder_nodes" .FolderTree}}
+            </ul>
+        </div>
+
+        <div class="tag-cloud">
+            <h3>标签</h3>
+            <div class="tag-list">
+                <a href="/{{if .PageSizeParam}}?size={{.PageSizeParam}}{{end}}" class="tag-item {{if not .CurrentTag}}active{{end}}">全部</a>
+                {{range .Tags}}
+                <a href="/?tag={{.ID}}{{if $.PageSizeParam}}&size={{$.PageSizeParam}}{{end}}" class="tag-item" style="--tag-color: {{.Color}}">
+                    {{.Name}} <span class="tag-count">{{.Count}}</span>
+                </a>
+                {{end}}
+            </div>
+        </div>
+    </aside>
+
+    <div class="bookmark-list">
+        {{if .Bookmarks}}
+        {{range .Bookmarks}}
+        <div class="bookmark-card">
+            <div class="bookmark-select">
+                <input type="checkbox" name="ids" value="{{.ID}}" class="bookmark-select-input" form="bulk-actions-form">
+            </div>
+            <div class="bookmark-favicon">
+                <img src="{{.Favicon}}" alt="" onerror="this.src='/static/img/default-favicon.png'">
+            </div>
+            <div class="bookmark-content">
+                <h3 class="bookmark-title">
+                    <a href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>
+                </h3>
+                <p class="bookmark-url">{{.URL}}</p>
+                {{if .Description}}
+                <p class="bookmark-desc">{{.Description}}</p>
+                {{end}}
+                <div class="bookmark-meta">
+                    <div class="bookmark-tags">
+                        {{range .Tags}}
+                        <a href="/?tag={{.ID}}{{if $.PageSizeParam}}&size={{$.PageSizeParam}}{{end}}" class="mini-tag" style="background-color: {{.Color}}">{{.Name}}</a>
+                        {{end}}
+                    </div>
+                    <span class="bookmark-date">{{.CreatedAt.Format "2006-01-02"}}</span>
+                </div>
+            </div>
+            <div class="bookmark-actions">
+                <a href="/bookmark/edit?id={{.ID}}" class="btn-icon" title="编辑">✏️</a>
+                <a href="/bookmark/delete?id={{.ID}}" class="btn-icon btn-danger" title="删除" onclick="return confirm('确定要删除这个收藏吗？')">🗑️</a>
+            </div>
+        </div>
+        {{end}}
+
+        {{if or .HasPrev .HasNext}}
+        <div class="pagination">
+            {{if .HasPrev}}
+            <a href="?page={{.PrevPage}}{{if .CurrentTag}}&tag={{.CurrentTag.ID}}{{end}}{{if .Search}}&q={{.Search}}{{end}}{{if .FolderParam}}&folder={{.FolderParam}}{{end}}{{if .PageSizeParam}}&size={{.PageSizeParam}}{{end}}" class="btn btn-outline">上一页</a>
+            {{end}}
+            <span class="page-info">第 {{.Page}} / {{.TotalPages}} 页</span>
+            <form method="GET" action="/" class="page-size-form">
+                {{if .CurrentTag}}<input type="hidden" name="tag" value="{{.CurrentTag.ID}}">{{end}}
+                {{if .Search}}<input type="hidden" name="q" value="{{.Search}}">{{end}}
+                {{if .FolderParam}}<input type="hidden" name="folder" value="{{.FolderParam}}">{{end}}
+                <label for="page-size-input" class="page-size-label">每页</label>
+                <input type="number" id="page-size-input" name="size" min="5" max="200" value="{{.PageSize}}" class="page-size-input">
+                <span class="page-size-unit">条</span>
+                <button type="submit" class="btn btn-outline btn-sm">应用</button>
+            </form>
+            {{if .HasNext}}
+            <a href="?page={{.NextPage}}{{if .CurrentTag}}&tag={{.CurrentTag.ID}}{{end}}{{if .Search}}&q={{.Search}}{{end}}{{if .FolderParam}}&folder={{.FolderParam}}{{end}}{{if .PageSizeParam}}&size={{.PageSizeParam}}{{end}}" class="btn btn-outline">下一页</a>
+            {{end}}
+        </div>
+        {{end}}
+        {{else}}
+        <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3>暂无收藏</h3>
+            <p>点击右上角"添加收藏"开始收藏你喜欢的网页</p>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- 右侧域名面板 -->
+    <aside class="domain-sidebar" id="domain-sidebar">
+        <div class="domain-sidebar-header">
+            <h3>域名管理</h3>
+            <div class="domain-sidebar-actions">
+                <button type="button" class="btn-icon btn-refresh-domain" id="btn-refresh-domain">刷新</button>
+                <button type="button" class="btn-icon" id="btn-toggle-domain-sidebar">&lt;</button>
+            </div>
+        </div>
+        <div class="domain-search" id="domain-search-box">
+            <input type="text" id="domain-search-input" placeholder="搜索域名..." class="domain-search-input">
+        </div>
+        <div class="domain-list" id="domain-list">
+            <div class="domain-loading">加载中...</div>
+        </div>
+    </aside>
+</div>
+
+<!-- 域名凭证编辑弹窗 -->
+<div id="credential-modal" class="modal" style="display:none;">
+    <div class="modal-content credential-modal">
+        <div class="credential-modal-header">
+            <h3>域名信息</h3>
+            <button type="button" class="btn-icon" id="close-credential-modal">×</button>
+        </div>
+        <div class="credential-domain-info">
+            <div class="credential-domain-name" id="credential-domain"></div>
+            <div class="credential-bookmark-count" id="credential-bookmark-count"></div>
+        </div>
+        <div class="credential-tabs">
+            <button type="button" class="credential-tab active" data-tab="credentials">账号密码</button>
+            <button type="button" class="credential-tab" data-tab="bookmarks">相关书签</button>
+        </div>
+        <div class="credential-tab-content" id="tab-credentials">
+            <!-- 账号列表 -->
+            <div id="credentials-list"></div>
+            <!-- 添加新账号按钮 -->
+            <button type="button" class="btn btn-outline btn-block" id="add-credential-btn" style="margin-top: 12px;">+ 添加新账号</button>
+        </div>
+        <div class="credential-tab-content" id="tab-bookmarks" style="display:none;">
+            <div class="credential-bookmarks-list" id="credential-bookmarks-list">
+                <!-- 书签列表将通过 JS 动态填充 -->
+            </div>
+        </div>
+        <div class="modal-actions" style="justify-content: space-between;">
+            <button type="button" class="btn btn-outline btn-danger" id="delete-domain-btn">删除此域名</button>
+            <button type="button" class="btn btn-outline" id="cancel-credential">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 删除域名确认弹窗 -->
+<div id="delete-domain-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <h3>确认删除</h3>
+        <p id="delete-domain-message" style="margin: 16px 0; color: var(--text-color);"></p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+            此操作只会删除域名管理中的数据（账号密码等），不会影响收藏夹中的书签。
+        </p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancel-delete-domain">取消</button>
+            <button type="button" class="btn btn-danger" id="confirm-delete-domain">确认删除</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 当前文件夹路径
+var currentFolderPath = '{{.FolderParam}}';
+var currentFolderName = '{{if .CurrentFolderName}}{{.CurrentFolderName}}{{else}}根目录{{end}}';
+
+// 恢复侧边栏滚动位置
+(function() {
+    var savedScroll = sessionStorage.getItem('sidebarScroll');
+    if (savedScroll) {
+        var sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+            sidebar.scrollTop = parseInt(savedScroll, 10);
+        }
+    }
+})();
+
+// 保存侧边栏滚动位置
+document.querySelector('.sidebar').addEventListener('scroll', function() {
+    sessionStorage.setItem('sidebarScroll', this.scrollTop);
+});
+
+// 点击链接前保存滚动位置
+document.querySelectorAll('.sidebar a').forEach(function(link) {
+    link.addEventListener('click', function() {
+        var sidebar = document.querySelector('.sidebar');
+        sessionStorage.setItem('sidebarScroll', sidebar.scrollTop);
+    });
+});
+
+// 文件夹展开/收起功能
+(function() {
+    // 从 sessionStorage 恢复展开状态
+    var expandedFolders = JSON.parse(sessionStorage.getItem('expandedFolders') || '{}');
+
+    // 应用保存的展开状态
+    document.querySelectorAll('.folder-tree-node').forEach(function(node) {
+        var row = node.querySelector('.folder-tree-row');
+        if (row) {
+            var path = row.getAttribute('data-folder-path');
+            if (path && expandedFolders[path]) {
+                node.classList.add('open');
+            }
+        }
+    });
+
+    // 点击 caret 切换展开/收起
+    document.querySelectorAll('.folder-caret').forEach(function(caret) {
+        if (caret.classList.contains('empty')) return; // 没有子文件夹的不处理
+
+        caret.style.cursor = 'pointer';
+        caret.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            var node = this.closest('.folder-tree-node');
+            var row = node.querySelector('.folder-tree-row');
+            var path = row ? row.getAttribute('data-folder-path') : null;
+
+            node.classList.toggle('open');
+
+            // 保存展开状态
+            if (path) {
+                if (node.classList.contains('open')) {
+                    expandedFolders[path] = true;
+                } else {
+                    delete expandedFolders[path];
+                }
+                sessionStorage.setItem('expandedFolders', JSON.stringify(expandedFolders));
+            }
+        });
+    });
+})();
+
+function applySort(value) {
+    var url = new URL(window.location.href);
+    if (value) {
+        url.searchParams.set('sort', value);
+    } else {
+        url.searchParams.delete('sort');
+    }
+    url.searchParams.delete('page');
+    window.location.href = url.toString();
+}
+
+// 移动书签功能
+document.getElementById('move-selected').addEventListener('click', function() {
+    document.getElementById('move-modal').style.display = 'flex';
+});
+document.getElementById('cancel-move').addEventListener('click', function() {
+    document.getElementById('move-modal').style.display = 'none';
+});
+document.getElementById('confirm-move').addEventListener('click', function() {
+    var targetFolder = document.getElementById('target-folder-input').value;
+    var form = document.getElementById('bulk-move-form');
+    var checkboxes = document.querySelectorAll('.bookmark-select-input:checked');
+    // 清空旧的隐藏字段
+    form.innerHTML = '';
+    checkboxes.forEach(function(cb) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'ids';
+        input.value = cb.value;
+        form.appendChild(input);
+    });
+    var folderInput = document.createElement('input');
+    folderInput.type = 'hidden';
+    folderInput.name = 'target_folder';
+    folderInput.value = targetFolder;
+    form.appendChild(folderInput);
+    form.submit();
+});
+
+// 更新移动按钮状态
+document.querySelectorAll('.bookmark-select-input').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        var checked = document.querySelectorAll('.bookmark-select-input:checked').length;
+        document.getElementById('move-selected').disabled = checked === 0;
+    });
+});
+
+// Favicon加载功能
+var faviconCancelled = false;
+var faviconMinimized = false;
+
+// 页面加载时检查是否有未完成的任务
+(function() {
+    var state = localStorage.getItem('faviconLoadState');
+    if (state) {
+        try {
+            var data = JSON.parse(state);
+            if (data.bookmarks && data.index < data.bookmarks.length) {
+                faviconMinimized = true;
+                document.getElementById('favicon-float').style.display = 'block';
+                updateFaviconProgress(data.index, data.bookmarks.length, '恢复加载中...');
+                setTimeout(function() {
+                    processFavicons(data.bookmarks, data.index, data.bookmarks.length);
+                }, 100);
+            } else {
+                localStorage.removeItem('faviconLoadState');
+            }
+        } catch (e) {
+            localStorage.removeItem('faviconLoadState');
+        }
+    }
+})();
+
+document.getElementById('load-favicons').addEventListener('click', function() {
+    faviconCancelled = false;
+    faviconMinimized = false;
+    localStorage.removeItem('faviconLoadState');
+    document.getElementById('favicon-modal').style.display = 'flex';
+    document.getElementById('favicon-float').style.display = 'none';
+    document.getElementById('favicon-current').textContent = '0';
+    document.getElementById('favicon-total').textContent = '0';
+    document.getElementById('favicon-progress-bar').style.width = '0%';
+    document.getElementById('favicon-status').textContent = '获取待处理书签...';
+    loadFavicons();
+});
+
+document.getElementById('minimize-favicon').addEventListener('click', function() {
+    faviconMinimized = true;
+    document.getElementById('favicon-modal').style.display = 'none';
+    document.getElementById('favicon-float').style.display = 'block';
+});
+
+document.getElementById('expand-favicon').addEventListener('click', function() {
+    faviconMinimized = false;
+    document.getElementById('favicon-modal').style.display = 'flex';
+    document.getElementById('favicon-float').style.display = 'none';
+});
+
+document.getElementById('cancel-favicon').addEventListener('click', function() {
+    faviconCancelled = true;
+    localStorage.removeItem('faviconLoadState');
+    document.getElementById('favicon-modal').style.display = 'none';
+    document.getElementById('favicon-float').style.display = 'none';
+});
+
+function loadFavicons() {
+    fetch('/api/favicon/pending')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.error) {
+                document.getElementById('favicon-status').textContent = '错误: ' + data.error;
+                return;
+            }
+            var bookmarks = data.bookmarks || [];
+            var total = bookmarks.length;
+            updateFaviconProgress(0, total, '准备开始...');
+            if (total === 0) {
+                updateFaviconProgress(0, 0, '所有书签已有图标');
+                localStorage.removeItem('faviconLoadState');
+                return;
+            }
+            // 保存状态
+            localStorage.setItem('faviconLoadState', JSON.stringify({
+                bookmarks: bookmarks,
+                index: 0
+            }));
+            processFavicons(bookmarks, 0, total);
+        })
+        .catch(function(err) {
+            document.getElementById('favicon-status').textContent = '请求失败: ' + err;
+        });
+}
+
+function updateFaviconProgress(current, total, status) {
+    var percent = total > 0 ? (current / total * 100) : 0;
+    // 更新弹窗
+    document.getElementById('favicon-current').textContent = current;
+    document.getElementById('favicon-total').textContent = total;
+    document.getElementById('favicon-progress-bar').style.width = percent + '%';
+    document.getElementById('favicon-status').textContent = status;
+    // 更新浮动条
+    document.getElementById('favicon-float-text').textContent = current + '/' + total;
+    document.getElementById('favicon-float-bar').style.width = percent + '%';
+}
+
+function processFavicons(bookmarks, index, total) {
+    if (faviconCancelled || index >= total) {
+        if (!faviconCancelled) {
+            updateFaviconProgress(total, total, '完成！');
+            localStorage.removeItem('faviconLoadState');
+            setTimeout(function() {
+                document.getElementById('favicon-modal').style.display = 'none';
+                document.getElementById('favicon-float').style.display = 'none';
+                location.reload();
+            }, 1000);
+        }
+        return;
+    }
+
+    var bm = bookmarks[index];
+    var statusText = '处理: ' + bm.url.substring(0, 40) + (bm.url.length > 40 ? '...' : '');
+    updateFaviconProgress(index + 1, total, statusText);
+
+    // 保存进度到 localStorage
+    localStorage.setItem('faviconLoadState', JSON.stringify({
+        bookmarks: bookmarks,
+        index: index + 1
+    }));
+
+    // 获取favicon URL
+    var favicon = getFaviconURL(bm.url);
+
+    // 更新到服务器
+    var formData = new FormData();
+    formData.append('id', bm.id);
+    formData.append('favicon', favicon);
+
+    fetch('/api/favicon/update', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function() {
+        setTimeout(function() {
+            processFavicons(bookmarks, index + 1, total);
+        }, 50);
+    })
+    .catch(function() {
+        // 失败时使用默认图标
+        formData.set('favicon', '/static/img/default-favicon.png');
+        fetch('/api/favicon/update', {
+            method: 'POST',
+            body: formData
+        }).finally(function() {
+            setTimeout(function() {
+                processFavicons(bookmarks, index + 1, total);
+            }, 50);
+        });
+    });
+}
+
+function getFaviconURL(url) {
+    try {
+        var domain = new URL(url).hostname;
+        return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32';
+    } catch (e) {
+        return '/static/img/default-favicon.png';
+    }
+}
+
+// 文件夹拖放功能
+var dragSourceFolder = null;
+var dragTargetFolder = null;
+
+document.querySelectorAll('.folder-tree-row[draggable="true"]').forEach(function(row) {
+    row.addEventListener('dragstart', function(e) {
+        dragSourceFolder = this.getAttribute('data-folder-path');
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragSourceFolder);
+    });
+
+    row.addEventListener('dragend', function(e) {
+        this.classList.remove('dragging');
+        document.querySelectorAll('.folder-tree-row').forEach(function(r) {
+            r.classList.remove('drag-over');
+        });
+    });
+
+    row.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var targetPath = this.getAttribute('data-folder-path');
+        // 不能拖到自己或自己的子文件夹
+        if (targetPath !== dragSourceFolder && !targetPath.startsWith(dragSourceFolder + '/')) {
+            this.classList.add('drag-over');
+        }
+    });
+
+    row.addEventListener('dragleave', function(e) {
+        this.classList.remove('drag-over');
+    });
+
+    row.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        dragTargetFolder = this.getAttribute('data-folder-path');
+
+        if (dragSourceFolder && dragTargetFolder !== dragSourceFolder && !dragTargetFolder.startsWith(dragSourceFolder + '/')) {
+            // 显示确认弹窗
+            var sourceName = dragSourceFolder.split('/').pop();
+            var targetName = dragTargetFolder.split('/').pop();
+            document.getElementById('folder-move-message').textContent =
+                '确定要将文件夹 "' + sourceName + '" 移动到 "' + targetName + '" 下吗？';
+            document.getElementById('folder-move-modal').style.display = 'flex';
+        }
+    });
+});
+
+// 根目录也可以作为放置目标
+var rootFolderLinks = document.querySelectorAll('.folder-tree-list > .folder-tree-node > .folder-tree-row');
+rootFolderLinks.forEach(function(row) {
+    if (!row.getAttribute('data-folder-path')) {
+        // 这是"全部"或"未分类"
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (dragSourceFolder) {
+                this.classList.add('drag-over');
+            }
+        });
+
+        row.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            // 移动到根目录
+            if (dragSourceFolder) {
+                dragTargetFolder = '__root__';
+                var sourceName = dragSourceFolder.split('/').pop();
+                document.getElementById('folder-move-message').textContent =
+                    '确定要将文件夹 "' + sourceName + '" 移动到根目录吗？';
+                document.getElementById('folder-move-modal').style.display = 'flex';
+            }
+        });
+    }
+});
+
+document.getElementById('cancel-folder-move').addEventListener('click', function() {
+    document.getElementById('folder-move-modal').style.display = 'none';
+    dragSourceFolder = null;
+    dragTargetFolder = null;
+});
+
+document.getElementById('confirm-folder-move').addEventListener('click', function() {
+    doFolderAction('/api/folder/move');
+});
+
+document.getElementById('merge-folder-move').addEventListener('click', function() {
+    doFolderAction('/api/folder/merge');
+});
+
+function doFolderAction(apiUrl) {
+    if (!dragSourceFolder || !dragTargetFolder) {
+        document.getElementById('folder-move-modal').style.display = 'none';
+        return;
+    }
+
+    var formData = new FormData();
+    formData.append('source', dragSourceFolder);
+    formData.append('target', dragTargetFolder);
+
+    fetch(apiUrl, {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        document.getElementById('folder-move-modal').style.display = 'none';
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('操作失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('folder-move-modal').style.display = 'none';
+        alert('请求失败: ' + err);
+    });
+
+    dragSourceFolder = null;
+    dragTargetFolder = null;
+}
+
+// 快速添加功能
+var quickAddTab = 'bookmark';
+
+document.getElementById('btn-quick-add').addEventListener('click', function() {
+    document.getElementById('quick-add-folder-name').textContent = currentFolderName || '根目录';
+    document.getElementById('quick-add-url').value = '';
+    document.getElementById('quick-add-title').value = '';
+    document.getElementById('quick-add-folder-input').value = '';
+    document.getElementById('quick-add-modal').style.display = 'flex';
+    document.getElementById('quick-add-url').focus();
+});
+
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        quickAddTab = this.getAttribute('data-tab');
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById('tab-bookmark').style.display = quickAddTab === 'bookmark' ? 'block' : 'none';
+        document.getElementById('tab-folder').style.display = quickAddTab === 'folder' ? 'block' : 'none';
+    });
+});
+
+document.getElementById('cancel-quick-add').addEventListener('click', function() {
+    document.getElementById('quick-add-modal').style.display = 'none';
+});
+
+document.getElementById('confirm-quick-add').addEventListener('click', function() {
+    if (quickAddTab === 'bookmark') {
+        addBookmark();
+    } else {
+        addFolder();
+    }
+});
+
+function addBookmark() {
+    var url = document.getElementById('quick-add-url').value.trim();
+    var title = document.getElementById('quick-add-title').value.trim();
+
+    if (!url) {
+        alert('请输入URL');
+        return;
+    }
+
+    // 如果没有协议，添加 https://
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+    }
+
+    var formData = new FormData();
+    formData.append('url', url);
+    formData.append('title', title || url);
+    formData.append('folder', currentFolderPath);
+
+    document.getElementById('confirm-quick-add').disabled = true;
+    document.getElementById('confirm-quick-add').textContent = '添加中...';
+
+    fetch('/api/bookmark/quick-add', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        document.getElementById('confirm-quick-add').disabled = false;
+        document.getElementById('confirm-quick-add').textContent = '确定';
+        if (data.success) {
+            document.getElementById('quick-add-modal').style.display = 'none';
+            location.reload();
+        } else {
+            alert('添加失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('confirm-quick-add').disabled = false;
+        document.getElementById('confirm-quick-add').textContent = '确定';
+        alert('请求失败: ' + err);
+    });
+}
+
+function addFolder() {
+    var name = document.getElementById('quick-add-folder-input').value.trim() || '新建文件夹';
+
+    var formData = new FormData();
+    formData.append('name', name);
+    formData.append('parent', currentFolderPath);
+
+    document.getElementById('confirm-quick-add').disabled = true;
+
+    fetch('/api/folder/create', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        document.getElementById('confirm-quick-add').disabled = false;
+        if (data.success) {
+            document.getElementById('quick-add-modal').style.display = 'none';
+            location.reload();
+        } else {
+            alert('创建失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('confirm-quick-add').disabled = false;
+        alert('请求失败: ' + err);
+    });
+}
+
+// ==================== 域名管理功能（原生 JavaScript）====================
+var currentCredentialDomain = '';
+var domainData = {
+    domains: [],
+    loading: true,
+    collapsed: localStorage.getItem('domainSidebarCollapsed') === 'true',
+    searchKeyword: '',
+    openIdx: -1
+};
+
+// 初始化域名管理
+(function() {
+    // 等待 DOM 加载完成
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDomainManager);
+    } else {
+        initDomainManager();
+    }
+})();
+
+function initDomainManager() {
+    console.log('初始化域名管理器');
+
+    // 初始化折叠状态
+    if (domainData.collapsed) {
+        document.getElementById('domain-sidebar').classList.add('collapsed');
+        document.getElementById('btn-toggle-domain-sidebar').textContent = '>';
+    }
+
+    // 绑定事件
+    document.getElementById('btn-refresh-domain').addEventListener('click', function() {
+        loadDomainData(true);
+    });
+
+    document.getElementById('btn-toggle-domain-sidebar').addEventListener('click', function() {
+        domainData.collapsed = !domainData.collapsed;
+        localStorage.setItem('domainSidebarCollapsed', domainData.collapsed);
+        document.getElementById('domain-sidebar').classList.toggle('collapsed', domainData.collapsed);
+        this.textContent = domainData.collapsed ? '>' : '<';
+    });
+
+    document.getElementById('domain-search-input').addEventListener('input', function() {
+        domainData.searchKeyword = this.value;
+        renderDomainList();
+    });
+
+    // 加载数据
+    loadDomainData(false);
+}
+
+function loadDomainData(refresh) {
+    domainData.loading = true;
+    domainData.openIdx = -1;
+    if (refresh) {
+        domainData.searchKeyword = '';
+        document.getElementById('domain-search-input').value = '';
+    }
+
+    var btn = document.getElementById('btn-refresh-domain');
+    btn.textContent = '刷新中...';
+    btn.disabled = true;
+
+    document.getElementById('domain-list').innerHTML = '<div class="domain-loading">加载中...</div>';
+
+    console.log('开始加载域名数据...');
+    fetch('/api/domain/list' + (refresh ? '?refresh=1' : ''))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            console.log('域名数据加载完成:', d);
+            domainData.loading = false;
+            btn.textContent = '刷新';
+            btn.disabled = false;
+
+            if (d.success && d.domains) {
+                domainData.domains = d.domains;
+                console.log('域名数量:', domainData.domains.length);
+                renderDomainList();
+            } else {
+                document.getElementById('domain-list').innerHTML = '<div class="domain-empty">加载失败</div>';
+            }
+        })
+        .catch(function(err) {
+            console.error('域名数据加载失败:', err);
+            domainData.loading = false;
+            btn.textContent = '刷新';
+            btn.disabled = false;
+            document.getElementById('domain-list').innerHTML = '<div class="domain-error">加载失败: ' + err + '</div>';
+        });
+}
+
+function getFilteredDomains() {
+    if (!domainData.searchKeyword) return domainData.domains;
+    var kw = domainData.searchKeyword.toLowerCase();
+    var result = [];
+    for (var i = 0; i < domainData.domains.length; i++) {
+        var g = domainData.domains[i];
+        if (g.top_domain.toLowerCase().indexOf(kw) !== -1) {
+            result.push(g);
+        } else if (g.sub_domains) {
+            var matched = [];
+            for (var j = 0; j < g.sub_domains.length; j++) {
+                if (g.sub_domains[j].toLowerCase().indexOf(kw) !== -1) {
+                    matched.push(g.sub_domains[j]);
+                }
+            }
+            if (matched.length > 0) {
+                result.push({ top_domain: g.top_domain, sub_domains: matched, bookmark_count: g.bookmark_count });
+            }
+        }
+    }
+    return result;
+}
+
+function renderDomainList() {
+    var container = document.getElementById('domain-list');
+    var filtered = getFilteredDomains();
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="domain-empty">暂无域名</div>';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+        var g = filtered[i];
+        var hasSubs = g.sub_domains && g.sub_domains.length > 0;
+        var isOpen = domainData.openIdx === i;
+        var caret = hasSubs ? (isOpen ? 'v' : '>') : '-';
+        var countText = '(' + g.bookmark_count + (hasSubs ? '/' + g.sub_domains.length : '') + ')';
+
+        html += '<div class="domain-group-item">';
+        html += '<div class="domain-group-header" data-idx="' + i + '">';
+        html += '<span class="domain-group-caret">' + caret + '</span>';
+        html += '<span class="domain-group-name">' + escapeHtml(g.top_domain) + '</span>';
+        html += '<span class="domain-group-count">' + countText + '</span>';
+        html += '<span class="btn-domain-edit" data-domain="' + escapeHtml(g.top_domain) + '">[管理]</span>';
+        html += '</div>';
+
+        if (isOpen && hasSubs) {
+            html += '<div class="domain-sublist">';
+            for (var j = 0; j < g.sub_domains.length; j++) {
+                var sub = g.sub_domains[j];
+                html += '<div class="domain-subitem">';
+                html += '<span class="domain-subitem-name">' + escapeHtml(sub) + '</span>';
+                html += '<span class="btn-domain-edit" data-domain="' + escapeHtml(sub) + '">[管理]</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    container.innerHTML = html;
+
+    // 绑定点击事件
+    container.querySelectorAll('.domain-group-header').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-domain-edit')) return;
+            var idx = parseInt(this.getAttribute('data-idx'));
+            domainData.openIdx = domainData.openIdx === idx ? -1 : idx;
+            renderDomainList();
+        });
+    });
+
+    container.querySelectorAll('.btn-domain-edit').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var domain = this.getAttribute('data-domain');
+            openCredentialModal(domain);
+        });
+    });
+}
+
+// 打开凭证编辑弹窗
+var credentialBookmarksLoaded = false; // 标记书签是否已加载
+var currentCredentials = []; // 当前域名的所有凭证
+
+function openCredentialModal(domain) {
+    currentCredentialDomain = domain;
+    credentialBookmarksLoaded = false;
+    currentCredentials = [];
+    document.getElementById('credential-domain').textContent = domain;
+    document.getElementById('credential-modal').style.display = 'flex';
+    document.getElementById('credentials-list').innerHTML = '<div class="domain-loading">加载中...</div>';
+    document.getElementById('credential-bookmarks-list').innerHTML = '<div class="domain-loading">点击标签加载书签...</div>';
+    document.getElementById('credential-bookmark-count').textContent = '';
+
+    // 切换到凭证标签
+    switchCredentialTab('credentials');
+
+    // 加载凭证数据
+    fetch('/api/domain/credential?domain=' + encodeURIComponent(domain) + '&no_bookmarks=1')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                currentCredentials = data.credentials || [];
+                renderCredentialsList();
+            } else {
+                document.getElementById('credentials-list').innerHTML = '<div class="domain-error">加载失败</div>';
+            }
+        })
+        .catch(function(err) {
+            console.error('加载凭证失败:', err);
+            document.getElementById('credentials-list').innerHTML = '<div class="domain-error">加载失败: ' + err + '</div>';
+        });
+}
+
+// 渲染凭证列表
+function renderCredentialsList() {
+    var container = document.getElementById('credentials-list');
+
+    if (currentCredentials.length === 0) {
+        container.innerHTML = '<div class="domain-empty">暂无保存的账号信息</div>';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < currentCredentials.length; i++) {
+        var cred = currentCredentials[i];
+        html += renderCredentialCard(cred, i);
+    }
+    container.innerHTML = html;
+
+    // 绑定事件
+    bindCredentialCardEvents();
+}
+
+// 渲染单个凭证卡片
+function renderCredentialCard(cred, index) {
+    var title = cred.title || '账号 ' + (index + 1);
+    var html = '<div class="credential-card" data-id="' + cred.id + '" data-index="' + index + '">';
+    html += '<div class="credential-card-header">';
+    html += '<span class="credential-card-title">' + escapeHtml(title) + '</span>';
+    html += '<div class="credential-card-actions">';
+    html += '<button type="button" class="btn-icon btn-edit-cred" title="编辑">✏️</button>';
+    html += '<button type="button" class="btn-icon btn-delete-cred btn-danger" title="删除">🗑️</button>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="credential-card-body">';
+    html += '<div class="credential-field">';
+    html += '<span class="credential-field-label">用户名:</span>';
+    html += '<span class="credential-field-value">' + escapeHtml(cred.username || '-') + '</span>';
+    html += '<button type="button" class="btn-copy-small" data-value="' + escapeHtml(cred.username || '') + '">复制</button>';
+    html += '</div>';
+    html += '<div class="credential-field">';
+    html += '<span class="credential-field-label">密码:</span>';
+    html += '<span class="credential-field-value credential-password-masked">••••••••</span>';
+    html += '<button type="button" class="btn-show-pwd" data-pwd="' + escapeHtml(cred.password || '') + '">显示</button>';
+    html += '<button type="button" class="btn-copy-small" data-value="' + escapeHtml(cred.password || '') + '">复制</button>';
+    html += '</div>';
+    if (cred.notes) {
+        html += '<div class="credential-field credential-notes-field">';
+        html += '<span class="credential-field-label">备注:</span>';
+        html += '<span class="credential-field-value credential-notes-text">' + escapeHtml(cred.notes) + '</span>';
+        html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+    return html;
+}
+
+// 绑定凭证卡片事件
+function bindCredentialCardEvents() {
+    // 复制按钮
+    document.querySelectorAll('.btn-copy-small').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var value = this.getAttribute('data-value');
+            copyToClipboard(value, this);
+        });
+    });
+
+    // 显示密码按钮
+    document.querySelectorAll('.btn-show-pwd').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var pwd = this.getAttribute('data-pwd');
+            var valueSpan = this.parentElement.querySelector('.credential-password-masked');
+            if (this.textContent === '显示') {
+                valueSpan.textContent = pwd || '-';
+                this.textContent = '隐藏';
+            } else {
+                valueSpan.textContent = '••••••••';
+                this.textContent = '显示';
+            }
+        });
+    });
+
+    // 编辑按钮
+    document.querySelectorAll('.btn-edit-cred').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var card = this.closest('.credential-card');
+            var index = parseInt(card.getAttribute('data-index'));
+            editCredential(index);
+        });
+    });
+
+    // 删除按钮
+    document.querySelectorAll('.btn-delete-cred').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var card = this.closest('.credential-card');
+            var id = parseInt(card.getAttribute('data-id'));
+            deleteCredential(id);
+        });
+    });
+}
+
+// 复制到剪贴板
+function copyToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(function() {
+        var originalText = btn.textContent;
+        btn.textContent = '已复制';
+        setTimeout(function() { btn.textContent = originalText; }, 1000);
+    }).catch(function() {
+        // 降级方案
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        var originalText = btn.textContent;
+        btn.textContent = '已复制';
+        setTimeout(function() { btn.textContent = originalText; }, 1000);
+    });
+}
+
+// 编辑凭证
+function editCredential(index) {
+    var cred = currentCredentials[index];
+    showCredentialForm(cred);
+}
+
+// 删除凭证
+function deleteCredential(id) {
+    if (!confirm('确定要删除这个账号信息吗？')) return;
+
+    var formData = new FormData();
+    formData.append('id', id);
+
+    fetch('/api/domain/credential/delete', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            // 从列表中移除
+            currentCredentials = currentCredentials.filter(function(c) { return c.id !== id; });
+            renderCredentialsList();
+        } else {
+            alert('删除失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(function(err) {
+        alert('请求失败: ' + err);
+    });
+}
+
+// 显示凭证编辑表单
+var editingCredentialId = null;
+
+function showCredentialForm(cred) {
+    editingCredentialId = cred ? cred.id : null;
+    var container = document.getElementById('credentials-list');
+
+    var html = '<div class="credential-form">';
+    html += '<div class="form-group">';
+    html += '<label>备注标题</label>';
+    html += '<input type="text" id="edit-cred-title" placeholder="例如：工作账号" class="form-input" value="' + escapeHtml(cred ? cred.title || '' : '') + '">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>用户名 / 邮箱</label>';
+    html += '<input type="text" id="edit-cred-username" placeholder="输入用户名或邮箱" class="form-input" value="' + escapeHtml(cred ? cred.username || '' : '') + '">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>密码</label>';
+    html += '<input type="text" id="edit-cred-password" placeholder="输入密码" class="form-input" value="' + escapeHtml(cred ? cred.password || '' : '') + '">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>备注</label>';
+    html += '<textarea id="edit-cred-notes" placeholder="其他备注信息" class="form-input" rows="3">' + escapeHtml(cred ? cred.notes || '' : '') + '</textarea>';
+    html += '</div>';
+    html += '<div class="form-actions">';
+    html += '<button type="button" class="btn btn-outline" id="cancel-edit-cred">取消</button>';
+    html += '<button type="button" class="btn btn-primary" id="save-edit-cred">保存</button>';
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // 绑定事件
+    document.getElementById('cancel-edit-cred').addEventListener('click', function() {
+        renderCredentialsList();
+    });
+
+    document.getElementById('save-edit-cred').addEventListener('click', function() {
+        saveCredentialForm();
+    });
+}
+
+// 保存凭证表单
+function saveCredentialForm() {
+    var title = document.getElementById('edit-cred-title').value;
+    var username = document.getElementById('edit-cred-username').value;
+    var password = document.getElementById('edit-cred-password').value;
+    var notes = document.getElementById('edit-cred-notes').value;
+
+    var formData = new FormData();
+    formData.append('title', title);
+    formData.append('username', username);
+    formData.append('password', password);
+    formData.append('notes', notes);
+
+    var url, isNew;
+    if (editingCredentialId) {
+        formData.append('id', editingCredentialId);
+        url = '/api/domain/credential/update';
+        isNew = false;
+    } else {
+        formData.append('domain', currentCredentialDomain);
+        url = '/api/domain/credential/save';
+        isNew = true;
+    }
+
+    var btn = document.getElementById('save-edit-cred');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '保存';
+        if (data.success) {
+            // 重新加载凭证列表
+            openCredentialModal(currentCredentialDomain);
+        } else {
+            alert('保存失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '保存';
+        alert('请求失败: ' + err);
+    });
+}
+
+// 添加新账号按钮
+document.getElementById('add-credential-btn').addEventListener('click', function() {
+    showCredentialForm(null);
+});
+
+// 懒加载书签数据
+function loadCredentialBookmarks() {
+    if (credentialBookmarksLoaded || !currentCredentialDomain) return;
+
+    document.getElementById('credential-bookmarks-list').innerHTML = '<div class="domain-loading">加载中...</div>';
+
+    fetch('/api/domain/credential?domain=' + encodeURIComponent(currentCredentialDomain))
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            credentialBookmarksLoaded = true;
+            if (data.success) {
+                var bookmarks = data.bookmarks || [];
+                document.getElementById('credential-bookmark-count').textContent = bookmarks.length + ' 个相关书签';
+                renderCredentialBookmarks(bookmarks);
+            } else {
+                document.getElementById('credential-bookmarks-list').innerHTML = '<div class="domain-error">加载失败</div>';
+            }
+        })
+        .catch(function(err) {
+            console.error('加载书签失败:', err);
+            document.getElementById('credential-bookmarks-list').innerHTML = '<div class="domain-error">加载失败: ' + err + '</div>';
+        });
+}
+
+// 渲染凭证相关的书签列表
+function renderCredentialBookmarks(bookmarks) {
+    var container = document.getElementById('credential-bookmarks-list');
+    if (bookmarks.length === 0) {
+        container.innerHTML = '<div class="domain-empty">暂无相关书签</div>';
+        return;
+    }
+
+    var html = '';
+    bookmarks.forEach(function(bm) {
+        var shortUrl = truncateUrl(bm.url, 50);
+        html += '<div class="credential-bookmark-item">';
+        html += '<img src="' + (bm.favicon || '/static/img/default-favicon.png') + '" class="credential-bookmark-favicon" onerror="this.src=\'/static/img/default-favicon.png\'">';
+        html += '<div class="credential-bookmark-info">';
+        html += '<a href="' + escapeHtml(bm.url) + '" target="_blank" class="credential-bookmark-title">' + escapeHtml(bm.title || '无标题') + '</a>';
+        html += '<div class="credential-bookmark-url" title="' + escapeHtml(bm.url) + '">' + escapeHtml(shortUrl) + '</div>';
+        html += '</div>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+// URL 截断函数
+function truncateUrl(url, maxLen) {
+    if (!url || url.length <= maxLen) return url;
+    var shortUrl = url.replace(/^https?:\/\//, '');
+    if (shortUrl.length <= maxLen) return shortUrl;
+    return shortUrl.substring(0, maxLen - 3) + '...';
+}
+
+// 切换凭证弹窗标签
+function switchCredentialTab(tab) {
+    document.querySelectorAll('.credential-tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+    });
+    document.getElementById('tab-credentials').style.display = tab === 'credentials' ? 'block' : 'none';
+    document.getElementById('tab-bookmarks').style.display = tab === 'bookmarks' ? 'block' : 'none';
+
+    if (tab === 'bookmarks') {
+        loadCredentialBookmarks();
+    }
+}
+
+// 凭证标签切换事件
+document.querySelectorAll('.credential-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+        switchCredentialTab(this.getAttribute('data-tab'));
+    });
+});
+
+// 关闭凭证弹窗
+document.getElementById('close-credential-modal').addEventListener('click', function() {
+    document.getElementById('credential-modal').style.display = 'none';
+});
+document.getElementById('cancel-credential').addEventListener('click', function() {
+    document.getElementById('credential-modal').style.display = 'none';
+});
+
+// 删除域名功能
+document.getElementById('delete-domain-btn').addEventListener('click', function() {
+    document.getElementById('delete-domain-message').textContent =
+        '确定要删除域名 "' + currentCredentialDomain + '" 的所有数据吗？';
+    document.getElementById('delete-domain-modal').style.display = 'flex';
+});
+
+document.getElementById('cancel-delete-domain').addEventListener('click', function() {
+    document.getElementById('delete-domain-modal').style.display = 'none';
+});
+
+document.getElementById('confirm-delete-domain').addEventListener('click', function() {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '删除中...';
+
+    var formData = new FormData();
+    formData.append('domain', currentCredentialDomain);
+
+    fetch('/api/domain/delete', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '确认删除';
+        if (data.success) {
+            document.getElementById('delete-domain-modal').style.display = 'none';
+            document.getElementById('credential-modal').style.display = 'none';
+            // 刷新域名列表
+            loadDomainData(false);
+        } else {
+            alert('删除失败: ' + (data.error || '未知错误'));
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '确认删除';
+        alert('请求失败: ' + err);
+    });
+});
+
+// HTML 转义函数（纯字符串替换，高性能）
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+{{end}}
+
+{{define "folder_nodes"}}
+{{range .}}
+<li class="folder-tree-node {{if .Open}}open{{end}}">
+    <div class="folder-tree-row" draggable="true" data-folder-path="{{.Path}}">
+        {{if .Children}}
+        <span class="folder-caret"></span>
+        {{else}}
+        <span class="folder-caret empty"></span>
+        {{end}}
+        <a href="/?folder={{.EncodedPath}}{{if .PageSizeParam}}&size={{.PageSizeParam}}{{end}}" class="folder-link {{if .Active}}active{{end}}">{{.Name}}</a>
+    </div>
+    {{if .Children}}
+    <ul class="folder-tree-list">
+        {{template "folder_nodes" .Children}}
+    </ul>
+    {{end}}
+</li>
+{{end}}
+{{end}}

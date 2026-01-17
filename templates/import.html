@@ -1,0 +1,72 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>导入书签</h1>
+</div>
+
+<div class="import-container">
+    <div class="import-section">
+        <h3>从浏览器导入</h3>
+        <p>支��导入 Chrome、Firefox、Edge 等浏览器导出的书签文件（HTML 格式）</p>
+
+        {{if .Error}}
+        <div class="alert alert-error">{{.Error}}</div>
+        {{end}}
+
+        {{if .Success}}
+        <div class="alert alert-success">{{.Success}}</div>
+        {{end}}
+
+        <form method="POST" action="/import" enctype="multipart/form-data" class="import-form">
+            <div class="form-group">
+                <label for="bookmarks_file">选择书签文件</label>
+                <input type="file" id="bookmarks_file" name="bookmarks_file" accept=".html,.htm" required>
+                <p class="form-hint">支持 .html 或 .htm 格式的书签导出文件</p>
+            </div>
+
+            <div class="form-group">
+                <label>导入选项</label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="skip_duplicates" value="1" checked>
+                    <span>跳过已存在的书签（根据 URL 判断）</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary">开始导入</button>
+        </form>
+    </div>
+
+    <div class="import-help">
+        <h3>如何导出浏览器书签？</h3>
+
+        <div class="help-item">
+            <h4>Chrome / Edge</h4>
+            <ol>
+                <li>打开浏览器，按 <code>Ctrl+Shift+O</code> 打开书签管理器</li>
+                <li>点击右上角的 <code>⋮</code> 菜单</li>
+                <li>选择「导出书签」</li>
+                <li>保存为 HTML 文件</li>
+            </ol>
+        </div>
+
+        <div class="help-item">
+            <h4>Firefox</h4>
+            <ol>
+                <li>按 <code>Ctrl+Shift+O</code> 打开书签管理器</li>
+                <li>点击「导入和备份」</li>
+                <li>选择「将书签导出为 HTML」</li>
+                <li>保存文件</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<div class="import-progress" id="import-progress" aria-hidden="true">
+    <div class="import-progress-box">
+        <div class="import-progress-title">正在导入...</div>
+        <div class="import-progress-bar">
+            <div class="import-progress-bar-inner"></div>
+        </div>
+        <div class="import-progress-tip">请勿关闭页面</div>
+    </div>
+</div>
+{{end}}

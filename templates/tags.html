@@ -1,0 +1,51 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>标签管理</h1>
+</div>
+
+<div class="tags-container">
+    <div class="tag-form-section">
+        <h3>添加新标签</h3>
+        {{if .Error}}
+        <div class="alert alert-error">{{.Error}}</div>
+        {{end}}
+        <form method="POST" action="/tag/add" class="tag-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <input type="text" name="name" placeholder="标签名称" required>
+                </div>
+                <div class="form-group">
+                    <input type="color" name="color" value="#3b82f6" title="选择颜色">
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="tag-list-section">
+        <h3>已有标签</h3>
+        {{if .Tags}}
+        <div class="tag-grid">
+            {{range .Tags}}
+            <div class="tag-card">
+                <div class="tag-info">
+                    <span class="tag-color" style="background-color: {{.Color}}"></span>
+                    <span class="tag-name">{{.Name}}</span>
+                    <span class="tag-count">{{.Count}} 个收藏</span>
+                </div>
+                <div class="tag-actions">
+                    <a href="/?tag={{.ID}}" class="btn-icon" title="查看">👁️</a>
+                    <a href="/tag/delete?id={{.ID}}" class="btn-icon btn-danger" title="删除"
+                       onclick="return confirm('确定要删除标签「{{.Name}}」吗？关联的收藏不会被删除。')">🗑️</a>
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+            <p>暂无标签，创建一个吧</p>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}

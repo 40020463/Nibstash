@@ -1,0 +1,60 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>小书签 (Bookmarklet)</h1>
+</div>
+
+<div class="bookmarklet-container">
+    <div class="bookmarklet-intro">
+        <h3>什么是小书签？</h3>
+        <p>小书签是一个可以保存在浏览器书签栏的特殊书签。点击它可以快速将当前浏览的网页收藏到{{.AppName}}。</p>
+    </div>
+
+    <div class="bookmarklet-install">
+        <h3>安装方法</h3>
+        <ol>
+            <li>显示浏览器的书签栏（Chrome: Ctrl+Shift+B / Mac: Cmd+Shift+B）</li>
+            <li>将下面的按钮<strong>拖拽</strong>到书签栏</li>
+            <li>完成！以后在任何网页点击这个书签即可收藏</li>
+        </ol>
+
+        <div class="bookmarklet-button-wrapper">
+            <a class="bookmarklet-button" href="javascript:(function(){var w=window.open('{{.BaseURL}}/bookmark/add?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'nibstash','width=600,height=500,scrollbars=yes');w.focus();})();">
+                🐹 收藏到{{.AppName}}
+            </a>
+            <p class="bookmarklet-hint">← 拖拽这个按钮到书签栏</p>
+        </div>
+    </div>
+
+    <div class="bookmarklet-code">
+        <h3>手动添加</h3>
+        <p>如果拖拽不起作用，可以手动创建书签：</p>
+        <ol>
+            <li>右键点击书签栏，选择"添加网页"或"添加书签"</li>
+            <li>名称填写：<code>收藏到{{.AppName}}</code></li>
+            <li>网址填写下面的代码：</li>
+        </ol>
+        <div class="code-block">
+            <code id="bookmarklet-code">javascript:(function(){var w=window.open('{{.BaseURL}}/bookmark/add?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title),'nibstash','width=600,height=500,scrollbars=yes');w.focus();})();</code>
+            <button class="btn btn-outline btn-sm" onclick="copyCode()">复制</button>
+        </div>
+    </div>
+
+    <div class="bookmarklet-tips">
+        <h3>使用提示</h3>
+        <ul>
+            <li>确保已登录{{.AppName}}，否则收藏时需要先登录</li>
+            <li>收藏窗口会自动填充当前页面的标题和网址</li>
+            <li>你可以在收藏时添加描述和标签</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+function copyCode() {
+    var code = document.getElementById('bookmarklet-code').textContent;
+    navigator.clipboard.writeText(code).then(function() {
+        alert('已复制到剪贴板');
+    });
+}
+</script>
+{{end}}

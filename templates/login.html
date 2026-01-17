@@ -1,0 +1,20 @@
+{{define "content"}}
+<div class="login-container">
+    <div class="login-box">
+        <h1>🌊 {{.AppName}}</h1>
+        <p class="login-subtitle">收藏</p>
+
+        {{if .Error}}
+        <div class="alert alert-error">{{.Error}}</div>
+        {{end}}
+
+        <form method="POST" action="/login" class="login-form">
+            <div class="form-group">
+                <label for="password">访问密码</label>
+                <input type="password" id="password" name="password" placeholder="请输入密码" autofocus required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">进入</button>
+        </form>
+    </div>
+</div>
+{{end}}

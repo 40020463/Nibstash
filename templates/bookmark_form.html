@@ -1,0 +1,55 @@
+{{define "content"}}
+<div class="page-header">
+    <h1>{{if .IsEdit}}编辑收藏{{else}}添加收藏{{end}}</h1>
+</div>
+
+<div class="form-container">
+    {{if .Error}}
+    <div class="alert alert-error">{{.Error}}</div>
+    {{end}}
+
+    <form method="POST" action="{{if .IsEdit}}/bookmark/edit{{else}}/bookmark/add{{end}}" class="bookmark-form">
+        {{if .IsEdit}}
+        <input type="hidden" name="id" value="{{.Bookmark.ID}}">
+        {{end}}
+
+        <div class="form-group">
+            <label for="url">网址 <span class="required">*</span></label>
+            <input type="url" id="url" name="url" placeholder="https://example.com" required
+                value="{{if .IsEdit}}{{.Bookmark.URL}}{{else}}{{.PrefilledURL}}{{end}}">
+        </div>
+
+        <div class="form-group">
+            <label for="title">标题 <span class="required">*</span></label>
+            <input type="text" id="title" name="title" placeholder="网页标题" required
+                value="{{if .IsEdit}}{{.Bookmark.Title}}{{else}}{{.PrefilledTitle}}{{end}}">
+        </div>
+
+        <div class="form-group">
+            <label for="description">描述</label>
+            <textarea id="description" name="description" rows="3" placeholder="添加一些描述...">{{if .IsEdit}}{{.Bookmark.Description}}{{end}}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label>标签</label>
+            <div class="tag-selector">
+                {{range .Tags}}
+                <label class="tag-checkbox">
+                    <input type="checkbox" name="tags" value="{{.ID}}"
+                        {{if $.IsEdit}}{{if index $.SelectedTagIDs .ID}}checked{{end}}{{end}}>
+                    <span class="tag-label" style="--tag-color: {{.Color}}">{{.Name}}</span>
+                </label>
+                {{end}}
+                {{if not .Tags}}
+                <p class="text-muted">暂无标签，<a href="/tags">去创建</a></p>
+                {{end}}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="/" class="btn btn-outline">取消</a>
+            <button type="submit" class="btn btn-primary">{{if .IsEdit}}保存修改{{else}}添加收藏{{end}}</button>
+        </div>
+    </form>
+</div>
+{{end}}
