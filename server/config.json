@@ -1,0 +1,9 @@
+{
+  "port": 8080,
+  "password": "nibstash",
+  "jwt_secret": "nibstash-jwt-secret-change-me-32bytes!",
+  "db_path": "data/nibstash.db",
+  "base_url": "http://localhost:8080",
+  "app_name": "囤囤鼠",
+  "encrypt_key": "nibstash-encrypt-key-32-bytes!!!"
+}

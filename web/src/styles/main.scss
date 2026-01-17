@@ -1,0 +1,270 @@
+// 主样式文件
+:root {
+  --primary-color: #409eff;
+  --success-color: #67c23a;
+  --warning-color: #e6a23c;
+  --danger-color: #f56c6c;
+  --info-color: #909399;
+  --bg-color: #f5f7fa;
+  --sidebar-width: 260px;
+  --domain-sidebar-width: 280px;
+  --navbar-height: 60px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #c0c4cc;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+// 布局
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: #fff;
+  border-right: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.navbar {
+  height: var(--navbar-height);
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.content-area {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+.domain-sidebar {
+  width: var(--domain-sidebar-width);
+  background: #fff;
+  border-left: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// 卡片样式
+.bookmark-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.3s;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .favicon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+  }
+
+  .title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #303133;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .url {
+    font-size: 13px;
+    color: #909399;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 8px;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover .actions {
+    opacity: 1;
+  }
+}
+
+// 文件夹树
+.folder-tree {
+  .folder-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 2px 0;
+
+    &:hover {
+      background: #f5f7fa;
+    }
+
+    &.active {
+      background: #ecf5ff;
+      color: var(--primary-color);
+    }
+
+    .folder-icon {
+      margin-right: 8px;
+    }
+
+    .folder-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .folder-count {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+}
+
+// 域名列表
+.domain-list {
+  .domain-item {
+    padding: 12px;
+    border-bottom: 1px solid #ebeef5;
+    cursor: pointer;
+
+    &:hover {
+      background: #f5f7fa;
+    }
+
+    &.active {
+      background: #ecf5ff;
+    }
+
+    .domain-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #303133;
+      margin-bottom: 4px;
+    }
+
+    .domain-count {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+}
+
+// 登录页
+.login-page {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+  .login-card {
+    width: 400px;
+    padding: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+
+      h1 {
+        font-size: 28px;
+        color: #303133;
+        margin-bottom: 8px;
+      }
+
+      p {
+        color: #909399;
+      }
+    }
+  }
+}
+
+// 响应式
+@media (max-width: 1200px) {
+  .domain-sidebar {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -100%;
+    z-index: 1000;
+    transition: left 0.3s;
+
+    &.open {
+      left: 0;
+    }
+  }
+}
